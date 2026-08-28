@@ -18,8 +18,8 @@ RUN curl -L https://dl.min.io/server/minio/release/linux-amd64/minio -o /usr/loc
   && chmod +x /usr/local/bin/minio
 
 # Install PO token provider (required for LOGIN_REQUIRED — not fallback)
-RUN pip install --no-cache-dir --break-system-packages bgutil-ytdlp-pot-provider \
-  && python3 -c "import bgutil_ytdlp_pot_provider; print('bgutil plugin ok')" \
+RUN python3 -m pip install --no-cache-dir --break-system-packages bgutil-ytdlp-pot-provider \
+  && python3 -c "import importlib.util; assert importlib.util.find_spec('yt_dlp_plugins.extractor.getpot_bgutil') is not None" \
   && git clone --single-branch --branch 1.3.2 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/bgutil-provider
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
