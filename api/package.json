@@ -8,6 +8,8 @@
     "build": "tsup",
     "start": "node dist/server.js",
     "infra:up": "docker compose up -d",
+    "infra:up:minio": "docker compose up -d minio",
+    "infra:up:api": "docker compose up -d --build api",
     "infra:down": "docker compose down",
     "infra:down:clean": "docker compose down -v",
     "lint": "eslint src",

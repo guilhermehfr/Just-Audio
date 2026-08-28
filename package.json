@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "concurrently -n api,web -c cyan,magenta \"pnpm --filter api run dev\" \"pnpm --filter web run dev\"",
-    "dev:infra": "pnpm --filter api run infra:up && pnpm run dev",
+    "dev:infra": "pnpm --filter api run infra:up:minio && pnpm run dev",
+    "dev:docker": "pnpm --filter api run infra:up && pnpm --filter web run dev",
     "start": "pnpm --filter api run start",
     "build:api": "pnpm --filter api run build",
     "build:web": "pnpm --filter web run build",
@@ -16,5 +17,6 @@
     "check:api": "pnpm --filter api run check",
     "check:web": "pnpm --filter web run lint",
     "check": "pnpm run check:api && pnpm run check:web"
-  }
+  },
+  "workspaces": ["api", "web", "packages/*"]
 }
