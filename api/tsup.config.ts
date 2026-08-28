@@ -6,6 +6,7 @@ export default defineConfig({
   platform: 'node',
   target: 'node20',
   external: ['dotenv'],
+  noExternal: ['@just-audio/shared'],
   bundle: true,
   splitting: false,
   clean: true,
