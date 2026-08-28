@@ -25,28 +25,27 @@
     "check": "pnpm lint && pnpm type-check && pnpm test:ci"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1037.0",
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@aws-sdk/client-s3": "^3.1119.0",
+    "@just-audio/shared": "workspace:*",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.4.1",
-    "youtube-dl-exec": "^3.1.5",
-    "@just-audio/shared": "workspace:*"
+    "express-rate-limit": "^8.6.2",
+    "youtube-dl-exec": "^3.1.13"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/node": "^20.19.39",
-    "@types/supertest": "^7.2.0",
-    "@typescript-eslint/eslint-plugin": "^8.59.0",
-    "@typescript-eslint/parser": "^8.59.0",
-    "eslint": "^10.2.1",
-    "prettier": "^3.8.3",
+    "@types/node": "^20.19.43",
+    "@types/supertest": "^7.2.1",
+    "@typescript-eslint/eslint-plugin": "^8.68.0",
+    "@typescript-eslint/parser": "^8.68.0",
+    "eslint": "^10.9.1",
+    "prettier": "^3.9.6",
     "supertest": "^7.2.2",
     "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.12",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.11"
   }
 }
