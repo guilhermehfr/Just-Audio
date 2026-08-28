@@ -51,6 +51,8 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
       args.push('--cookies', '/app/cookies.txt')
     }
     args.push(
+      '--js-runtimes', 'deno',
+      '--extractor-args', 'youtube:player_client=android,web',
       '--print', 'title',
       '--print', 'duration',
       '--no-playlist',
@@ -62,32 +64,34 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
     const child = spawn(ytDlpPath, args)
 
     const timeout = setTimeout(() => {
-      child.kill()
-      reject(new YouTubeDLError('yt-dlp timed out after 30s'))
+      child.kill('SIGTERM')
+      reject(new YouTubeDLError('yt-dlp timed out after 120s'))
     }, 120_000)
 
     const maxBytes = env.audio.maxFileSize * 1024 * 1024
     let totalBytes = 0
+    let settled = false
 
     child.stdout.on('data', (chunk: Buffer) => {
+      if (settled) return
       totalBytes += chunk.length
+      output += chunk.toString()
       if (totalBytes > maxBytes) {
-        child.kill()
-        child.stdout?.destroy(
-          new YouTubeDLError(`File too large: exceeded ${env.audio.maxFileSize}MB`)
-        )
+        settled = true
+        clearTimeout(timeout)
+        child.kill('SIGTERM')
+        child.stdout.destroy()
+        reject(new YouTubeDLError(`File too large: exceeded ${env.audio.maxFileSize}MB`))
       }
-    })
-
-    child.stdout.on('data', (data: Buffer) => {
-      output += data.toString()
     })
 
     child.stderr.on('data', (data: Buffer) => {
       errorOutput += data.toString()
     })
 
-    child.on('close', (code: number) => {
+    child.on('close', (code: number | null) => {
+      if (settled) return
+      settled = true
       clearTimeout(timeout)
 
       if (code !== 0) {
@@ -105,6 +109,8 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
     })
 
     child.on('error', (error: Error) => {
+      if (settled) return
+      settled = true
       clearTimeout(timeout)
       reject(error)
     })
@@ -115,6 +121,8 @@ export async function createAudioStream(url: string): Promise<{ stream: Readable
 
   const child = spawn(ytDlpPath, [
     ...(fs.existsSync('/app/cookies.txt') ? ['--cookies', '/app/cookies.txt'] : []),
+    '--js-runtimes', 'deno',
+    '--extractor-args', 'youtube:player_client=android,web',
     '--format',
     'bestaudio/best',
     '--no-playlist',
@@ -129,8 +137,32 @@ export async function createAudioStream(url: string): Promise<{ stream: Readable
     throw new YouTubeDLError('Failed to create audio stream - no stdout')
   }
 
+  let stderr = ''
+  child.stderr?.on('data', (d: Buffer) => {
+    stderr += d.toString()
+  })
+
+  // Guard: kill if yt-dlp hangs before producing data (no output for 120s)
+  const startTimeout = setTimeout(() => {
+    child.kill('SIGTERM')
+    child.stdout?.destroy(new YouTubeDLError(`yt-dlp audio stream timed out after 120s: ${stderr.slice(0, 500)}`))
+  }, 120_000)
+
+  child.stdout.on('data', () => {
+    clearTimeout(startTimeout)
+  })
+
   child.on('error', (error: Error) => {
+    clearTimeout(startTimeout)
     child.stdout?.destroy(error)
+  })
+
+  child.on('close', (code: number | null) => {
+    clearTimeout(startTimeout)
+    if (code !== null && code !== 0) {
+      const err = new YouTubeDLError(`yt-dlp stream failed with code ${code}: ${stderr.slice(0, 500) || 'Unknown error'}`)
+      if (!child.stdout.destroyed) child.stdout.destroy(err)
+    }
   })
 
   return { stream: child.stdout }

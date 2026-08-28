@@ -17,12 +17,20 @@ export async function segmentAudioToHLS(
   const segmentsDuration = getSegmentsDuration(durationSeconds).toString()
 
   const ffmpeg = spawn('ffmpeg', [
+    '-hide_banner',
+    '-y',
     '-i', 'pipe:0',
+    '-vn',
     '-c:a', 'aac',
+    '-profile:a', 'aac_low',
+    '-ac', '2',
+    '-ar', '44100',
     '-b:a', '128k',
     '-hls_time', segmentsDuration,
     '-hls_list_size', '0',
     '-hls_playlist_type', 'event',
+    '-hls_flags', 'independent_segments',
+    '-hls_segment_type', 'mpegts',
     '-hls_segment_filename', `${outputDir}/segment_%03d.ts`,
     `${outputDir}/playlist.m3u8`,
   ])
@@ -32,8 +40,13 @@ export async function segmentAudioToHLS(
   // Ignore stdin EPIPE — happens naturally on ffmpeg close
   ffmpeg.stdin.on('error', () => {})
 
+  let ffmpegStderr = ''
+  ffmpeg.stderr?.on('data', (d: Buffer) => {
+    ffmpegStderr += d.toString()
+  })
+
   return new Promise<void>((resolve, reject) => {
-    let resolved = false
+    let settled = false
     const uploaded = new Set<string>()
     let playlistMtime = 0
     let interval: ReturnType<typeof setInterval>
@@ -74,14 +87,6 @@ export async function segmentAudioToHLS(
             : 'video/mp2t'
           await uploadFile(`${trackingId}/${filename}`, data, contentType)
           uploaded.add(filename)
-
-          if (!resolved && uploaded.has('playlist.m3u8')) {
-            const hasSegment = [...uploaded].some((f) => SEGMENT_RE.test(f))
-            if (hasSegment) {
-              resolved = true
-              resolve()
-            }
-          }
         } catch (err) {
           console.error(`Upload failed for ${filename}:`, err)
         }
@@ -91,29 +96,35 @@ export async function segmentAudioToHLS(
     interval = setInterval(uploadNewFiles, 500)
 
     ffmpeg.on('close', async (code) => {
+      if (settled) return
+      settled = true
       clearInterval(interval)
       await uploadNewFiles()
 
-      if (code !== 0 && !resolved) {
+      const hasPlaylist = uploaded.has('playlist.m3u8')
+      const hasSegment = [...uploaded].some((f) => SEGMENT_RE.test(f))
+
+      if (code !== 0) {
         await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {})
-        reject(new Error(`ffmpeg exited with code ${code}`))
+        reject(new Error(`ffmpeg exited with code ${code}: ${ffmpegStderr.slice(0, 500)}`))
         return
       }
 
-      if (!resolved) {
+      if (!hasPlaylist || !hasSegment) {
         await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {})
-        reject(new Error('ffmpeg finished but no HLS output found'))
+        reject(new Error(`ffmpeg finished but no HLS output found (playlist:${hasPlaylist} segment:${hasSegment})`))
         return
       }
 
       await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {})
+      resolve()
     })
 
     ffmpeg.on('error', (err) => {
-      if (!resolved) {
-        clearInterval(interval)
-        reject(err)
-      }
+      if (settled) return
+      settled = true
+      clearInterval(interval)
+      reject(err)
     })
   })
 }
