@@ -24,7 +24,8 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages bgutil-ytdlp-p
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-COPY api/package.json ./api/
+COPY packages/shared/package.json ./packages/shared/package.json
+COPY api/package.json ./api/package.json
 
 RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm rebuild esbuild
 
@@ -38,7 +39,7 @@ RUN YT_DLP_DIR=$(find /app/node_modules/.pnpm -path "*/node_modules/youtube-dl-e
 
 COPY . .
 
-RUN pnpm --filter api build
+RUN YOUTUBE_DL_SKIP_DOWNLOAD=1 pnpm --filter api build
 
 COPY api/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
